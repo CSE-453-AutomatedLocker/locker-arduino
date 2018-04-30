@@ -55,13 +55,14 @@ Button btn(2);
 */
 int handleIntermediateState() {
   long t = btn.getSec();
+  long m = btn.getMilli();
   if ( t == -1 ) {
     return 3; // If button has been released: state -> shortPress (3)
   }
-  if ( (t >= 0) && (t < 10) ) {
+  if ( (t < 5) ) {
     return 1;  // if still being presses, remain in same state
   }
-  if ( t >= 10 ) {
+  if ( t >= 5 ) {
     return 2; // If t > 10, state -> longPress (2)
   }
 }
@@ -88,7 +89,7 @@ void setup() {
   addKey(key2);
 }
 
-void loop() {
+void handleEEPROM() {
   // Look for new cards
   if ( ! rfid.PICC_IsNewCardPresent())
     return;
@@ -118,43 +119,11 @@ void loop() {
   //    printDec(rfid.uid.uidByte, rfid.uid.size);
   //    Serial.println();
 
-
-
-  int byte0 = 0x5A;
-  int byte1 = 0xA4;
-  int byte2 = 0xDB;
-  int byte3 = 0xD9;
-
-
-
-  int byteA = 0x80;
-  int byteB = 0x48;
-  int byteC = 0xFD;
-  int byteD = 0xA3;
-
   Serial.print("Res: ");
   bool res = containsKey(rfid.uid.uidByte);
   Serial.println(res);
 
-  if (rfid.uid.uidByte[0] == byte0 &&
-      rfid.uid.uidByte[1] == byte1 &&
-      rfid.uid.uidByte[2] == byte2 &&
-      rfid.uid.uidByte[3] == byte3 ) {
-
-    Serial.println(F("The keys match!"));
-    correct_key = true;
-
-  }
-
-  if (rfid.uid.uidByte[0] == byteA &&
-      rfid.uid.uidByte[1] == byteB &&
-      rfid.uid.uidByte[2] == byteC &&
-      rfid.uid.uidByte[3] == byteD ) {
-    Serial.println(F("The card matches!"));
-    correct_key = false;
-  }
-
-  if (correct_key) {
+  if (res) {
     digitalWrite(led, HIGH);
     delay(10000);
     digitalWrite(led, LOW);
@@ -162,60 +131,82 @@ void loop() {
   }
   else {
     digitalWrite(led, LOW);
+  }  
+}
+
+void handleAddKeyState() {
+  if (btn.read() == HIGH) {
+    state = 4;
   }
+  else {
+    // Look for new cards
+    if ( ! rfid.PICC_IsNewCardPresent())
+      return;
+
+    // Verify if the NUID has been read
+    if ( ! rfid.PICC_ReadCardSerial())
+      return;
+
+    Serial.print(F("PICC type: "));
+    MFRC522::PICC_Type piccType = rfid.PICC_GetType(rfid.uid.sak);
+    Serial.println(rfid.PICC_GetTypeName(piccType));
+
+    //  // Check is the PICC of Classic MIFARE type
+    if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&
+      piccType != MFRC522::PICC_TYPE_MIFARE_1K &&
+      piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
+      Serial.println(F("Your tag is not of type MIFARE Classic."));
+      return;
+    }
+        
+    addKey(rfid.uid.uidByte);
+  }
+}
+
+void loop() {
   /**
      State Machine:
      0 -> Normal Mode (Read Tag and compare with EEPROM)
      1 -> 0 <= t < TIMEOUT (Intermediate State)
      2 -> Long Press (If t >= TIMEOUT)
      3 -> Short Press (If released and previous state was 1)
+     4 -> State after the short press which waits for a button press to return to the Normal Mode
   */
   switch (state) {
     case 0:
+      Serial.print(F("In state 0: Normal state"));
+      Serial.print("\n");
       if (btn.read() == HIGH) {
         state = 1;
       }
       else {
-        // handle EEPROM stuff (need to create function)
+        // handle EEPROM
+        handleEEPROM();
       }
       break;
     case 1:
+      Serial.print(F("In state 1: holding button down"));
+      Serial.print("\n");
       state = handleIntermediateState();
       break;
     case 2:
       // Handle Long Press -> delete all
+      Serial.print(F("In state 2: deleting all keys"));
+      Serial.print("\n");
       deleteKeys();
       state = 0;
       break;
     case 3:
       // Handle Short press -> add keys state
-      // TODO: Function needs to be written
+      Serial.print(F("In state 3: adding keys"));
+      Serial.print("\n");
+      handleAddKeyState();
       break;
-  }
-
-
-  if (state == 0) {
-    if (btn.read() == HIGH) {
-      state = 1;
-    }
-  }
-  else if (state == 1) {
-    if (btn.read() == LOW) {
-      if (btn.getSec() >= 10) {
-        state = 2;
+    case 4: // Extra state after done adding keys, need to press button again to go back to normal state
+      if (btn.read() == LOW) {
+        state = 0;
       }
-      else {
-        state = 3;
-      }
-    }
-  }
-  else if (state == 2) {
-    // Delete all tags
-    deleteKeys();
-  }
-  else if (state == 3) {
-    // Add key state
-
+      break;
   }
 }
 
