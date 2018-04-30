@@ -32,7 +32,7 @@ long Button::getSec() {
   if(this->read() == PRESSED) {
     return this->secs_held;
   } else {
-    return 0;
+    return -1;
   }
 }
 
@@ -40,6 +40,6 @@ long Button::getMilli() {
   if(this->read() == PRESSED) {
     return this->millis_held;
   } else {
-    return 0;
+    return -1;
   }
 }
