@@ -44,6 +44,9 @@ MFRC522::MIFARE_Key key;
 byte nuidPICC[4];
 
 int led = 3;
+int redled = A0;
+int blueled = A1;
+int greenled = A2;
 bool correct_key = false;
 int state = 0;
 Button btn(2);
@@ -87,6 +90,10 @@ void setup() {
   addKey(key1);
   byte key2[] = {0x80, 0x48, 0xFD, 0xA3};
   addKey(key2);
+
+  pinMode(redled, OUTPUT);
+  pinMode(blueled, OUTPUT);
+  pinMode(greenled, OUTPUT);
 }
 
 void handleEEPROM() {
@@ -164,6 +171,9 @@ void handleAddKeyState() {
 }
 
 void loop() {
+  analogWrite(redled, 0);
+  analogWrite(blueled, 0);
+  analogWrite(greenled, 0);
   /**
      State Machine:
      0 -> Normal Mode (Read Tag and compare with EEPROM)
