@@ -195,6 +195,7 @@ void loop() {
       Serial.print("\n");
       deleteKeys();
       state = 0;
+      delay(1000);  // NOTE: A delay is needed to prevent the state from going to 3 immediately
       break;
     case 3:
       // Handle Short press -> add keys state
