@@ -3,7 +3,7 @@
 #define PRESSED     HIGH
 #define NOT_PRESSED LOW
 
-#define TIME_DIFF   200
+#define TIME_DIFF   100
 #define PUSH_DIFF
 
 Button::Button(int pin)
