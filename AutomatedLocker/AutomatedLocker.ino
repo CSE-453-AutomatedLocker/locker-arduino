@@ -144,7 +144,7 @@ void handleAddKeyState() {
 }
 
 void loop() {
-  if (!locked && (millis() - unlocked_time > 5000)) {
+  if (!locked && (millis() - unlocked_time > 10000)) {
     Serial.println("LOCK!");
     system_timeout = millis(); // resets the timer
     locked = true;
@@ -177,6 +177,7 @@ void loop() {
         //        Serial.println(F("handle EEPROM"));
         if (handleEEPROM()) {
           Serial.println("UNLOCK!!");
+          system_timeout = millis(); // resets the timer
           locked = false;
           unlocked_time = millis();
           digitalWrite(LED_BUILTIN, HIGH);
