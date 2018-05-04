@@ -13,7 +13,7 @@ MFRC522::MIFARE_Key key;
 // Init array that will store new NUID
 byte nuidPICC[4];
 
-int led = 3;
+int led = 8;
 int redled = 4;
 int blueled = 6;
 int greenled = 7;
@@ -250,8 +250,17 @@ void printDec(byte *buffer, byte bufferSize) {
 void addKey(byte tag[]) {
   if (containsKey(tag)) {
     Serial.println("Key already added!");
+    digitalWrite(redled, 0); // actually green
+    digitalWrite(blueled, 0); // red
+    delay(250);
     return;
   }
+
+  digitalWrite(redled, 1); // actually green
+  digitalWrite(blueled, 0); // red
+
+  delay(250);
+  
   uint8_t offset = EEPROM.read(0);
   int addr = (offset * 4) + 1;
   for (int i = 0; i < 4; i++) {
