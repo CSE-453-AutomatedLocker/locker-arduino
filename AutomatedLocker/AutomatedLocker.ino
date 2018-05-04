@@ -22,6 +22,7 @@ int state = 0;
 Button btn(2);
 bool locked = true;
 long unlocked_time = 0;
+long system_timeout = 0;
 
 /* Bunch of function declarations */
 void printHex(byte *buffer, byte bufferSize);
@@ -65,6 +66,8 @@ void setup() {
   pinMode(blueled, OUTPUT);
   pinMode(greenled, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
+
+  system_timeout = millis(); // Start up the system timeout
 }
 
 bool handleEEPROM() {
@@ -143,9 +146,13 @@ void handleAddKeyState() {
 void loop() {
   if (!locked && (millis() - unlocked_time > 5000)) {
     Serial.println("LOCK!");
+    system_timeout = millis(); // resets the timer
     locked = true;
     digitalWrite(led, LOW);
     digitalWrite(LED_BUILTIN, LOW);
+  }
+  if (state == 0 && millis() - system_timeout > 10000) {
+    digitalWrite(3, HIGH);  // Turn off system
   }
   /**
     State Machine:
@@ -176,6 +183,7 @@ void loop() {
           digitalWrite(led, HIGH);
         }
       }
+      
       break;
     case 1:
       //      Serial.print(F("In state 1: holding button down"));
@@ -191,6 +199,7 @@ void loop() {
       //      Serial.print("\n");
       deleteKeys();
       state = 0;
+      system_timeout = millis(); // reset the timer
       digitalWrite(redled, 1); // actually green
       digitalWrite(blueled, 0); // red
       digitalWrite(greenled, 1); // blue
@@ -208,6 +217,7 @@ void loop() {
     case 4: // Extra state after done adding keys, need to press button again to go back to normal state
       if (btn.read() == LOW) {
         state = 0;
+        system_timeout = millis(); // reset the timer
       }
       break;
   }
@@ -252,14 +262,14 @@ void addKey(byte tag[]) {
     Serial.println("Key already added!");
     digitalWrite(redled, 0); // actually green
     digitalWrite(blueled, 0); // red
-    delay(250);
+    delay(250); // Delay to make the flash visible
     return;
   }
 
   digitalWrite(redled, 1); // actually green
   digitalWrite(blueled, 0); // red
 
-  delay(250);
+  delay(250); // Delay to make the flash visible
   
   uint8_t offset = EEPROM.read(0);
   int addr = (offset * 4) + 1;
