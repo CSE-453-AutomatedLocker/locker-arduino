@@ -36,6 +36,7 @@ int handleIntermediateState() {
   long t = btn.getSec();
   long m = btn.getMilli();
   if ( t == -1 ) {
+    system_timeout = millis(); // reset the timer
     return 3; // If button has been released: state -> shortPress (3)
   }
   if ( (t < 5) ) {
@@ -151,8 +152,9 @@ void loop() {
     digitalWrite(led, LOW);
     digitalWrite(LED_BUILTIN, LOW);
   }
-  if (state == 0 && millis() - system_timeout > 10000) {
+  if ((state == 0 || state == 3) && millis() - system_timeout > 10000) {
     digitalWrite(3, HIGH);  // Turn off system
+    Serial.println(F("System timed out!"));
   }
   /**
     State Machine:
@@ -264,6 +266,7 @@ void addKey(byte tag[]) {
     digitalWrite(redled, 0); // actually green
     digitalWrite(blueled, 0); // red
     delay(250); // Delay to make the flash visible
+    system_timeout = millis(); // resets the timer
     return;
   }
 
@@ -283,6 +286,8 @@ void addKey(byte tag[]) {
   Serial.println(id, HEX);
   offset += 1;
   EEPROM.write(0, offset);
+
+  system_timeout = millis(); // resets the timer
 }
 
 void deleteKeys() {
