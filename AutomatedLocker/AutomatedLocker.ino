@@ -13,10 +13,10 @@ MFRC522::MIFARE_Key key;
 // Init array that will store new NUID
 byte nuidPICC[4];
 
-int led = 8;
-int redled = 4;
-int blueled = 6;
-int greenled = 7;
+int solenoid = 8;
+int greenled = 4;
+int redled = 6;
+int blueled = 7;
 bool correct_key = false;
 int state = 0;
 Button btn(2);
@@ -111,6 +111,16 @@ bool handleEEPROM() {
   Serial.println(res);
   if (res) {
     unlocked_time = millis();
+    digitalWrite(greenled, 0);
+    digitalWrite(redled, 1);
+    digitalWrite(blueled, 1);
+    delay(250); // Delay to make the flash visible
+  }
+  else {
+    digitalWrite(greenled, 1);
+    digitalWrite(redled, 0);
+    digitalWrite(blueled, 1);
+    delay(250); // Delay to make the flash visible
   }
   return res;
 }
@@ -149,7 +159,7 @@ void loop() {
     Serial.println("LOCK!");
     system_timeout = millis(); // resets the timer
     locked = true;
-    digitalWrite(led, LOW);
+    digitalWrite(solenoid, LOW);
     digitalWrite(LED_BUILTIN, LOW);
   }
   if ((state == 0 || state == 3) && millis() - system_timeout > 10000) {
@@ -166,9 +176,9 @@ void loop() {
   */
   switch (state) {
     case 0:
-      digitalWrite(redled, 0); // actually green
-      digitalWrite(blueled, 0); // red
-      digitalWrite(greenled, 0); // blue
+      digitalWrite(greenled, 0);
+      digitalWrite(redled, 0);
+      digitalWrite(blueled, 0);
       //      Serial.print(F("In state 0: Normal state"));
       //      Serial.print("\n");
       if (btn.read() == HIGH) {
@@ -183,7 +193,7 @@ void loop() {
           locked = false;
           unlocked_time = millis();
           digitalWrite(LED_BUILTIN, HIGH);
-          digitalWrite(led, HIGH);
+          digitalWrite(solenoid, HIGH);
         }
       }
       
@@ -192,9 +202,9 @@ void loop() {
       //      Serial.print(F("In state 1: holding button down"));
       //      Serial.print("\n");
       state = handleIntermediateState();
-      digitalWrite(redled, 1); // actually green
-      digitalWrite(blueled, 1); // red
-      digitalWrite(greenled, 0); // blue
+      digitalWrite(greenled, 0);
+      digitalWrite(redled, 0);
+      digitalWrite(blueled, 1);
       break;
     case 2:
       // Handle Long Press -> delete all
@@ -203,9 +213,9 @@ void loop() {
       deleteKeys();
       state = 0;
       system_timeout = millis(); // reset the timer
-      digitalWrite(redled, 1); // actually green
-      digitalWrite(blueled, 0); // red
-      digitalWrite(greenled, 1); // blue
+      digitalWrite(greenled, 1);
+      digitalWrite(redled, 0);
+      digitalWrite(blueled, 1);
       delay(1000);  // NOTE: A delay is needed to prevent the state from going to 3 immediately
       break;
     case 3:
@@ -213,9 +223,9 @@ void loop() {
       //      Serial.print(F("In state 3: adding keys"));
       //      Serial.print("\n");
       handleAddKeyState();
-      digitalWrite(redled, 0); // actually green
-      digitalWrite(blueled, 1); // red
-      digitalWrite(greenled, 1); // blue
+      digitalWrite(greenled, 1);
+      digitalWrite(redled, 0);
+      digitalWrite(blueled, 0);
       break;
     case 4: // Extra state after done adding keys, need to press button again to go back to normal state
       if (btn.read() == LOW) {
@@ -237,7 +247,7 @@ void loop() {
 //}
 
 void lightLED(void) {
-  digitalWrite(led, HIGH);
+  digitalWrite(solenoid, HIGH);
 }
 /**
    Helper routine to dump a byte array as hex values to Serial.
@@ -263,15 +273,17 @@ void printDec(byte *buffer, byte bufferSize) {
 void addKey(byte tag[]) {
   if (containsKey(tag)) {
     Serial.println("Key already added!");
-    digitalWrite(redled, 0); // actually green
-    digitalWrite(blueled, 0); // red
+    digitalWrite(greenled, 1);
+    digitalWrite(redled, 0);
+    digitalWrite(blueled, 1);
     delay(250); // Delay to make the flash visible
     system_timeout = millis(); // resets the timer
     return;
   }
 
-  digitalWrite(redled, 1); // actually green
-  digitalWrite(blueled, 0); // red
+  digitalWrite(greenled, 0);
+  digitalWrite(redled, 1);
+  digitalWrite(blueled, 1);
 
   delay(250); // Delay to make the flash visible
   
