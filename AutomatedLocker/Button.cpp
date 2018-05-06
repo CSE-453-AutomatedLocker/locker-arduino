@@ -3,8 +3,7 @@
 #define PRESSED     HIGH
 #define NOT_PRESSED LOW
 
-#define TIME_DIFF   100
-#define PUSH_DIFF
+#define DEBOUNCE_TIME   200
 
 Button::Button(int pin)
   : pin(pin), current(NOT_PRESSED)
@@ -17,7 +16,9 @@ int Button::read() {
   current = digitalRead(pin);
 
   // If the button state changes to pressed, remember start time
-  if (current == PRESSED && previous == NOT_PRESSED && (millis() - firstTime) > TIME_DIFF) {
+  if (current == PRESSED 
+      && previous == NOT_PRESSED 
+      && (millis() - firstTime) > DEBOUNCE_TIME) {
     firstTime = millis();
   }
 

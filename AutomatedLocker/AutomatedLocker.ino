@@ -1,38 +1,54 @@
 #include <SPI.h>
 #include <MFRC522.h>
 #include <EEPROM.h>
-#include "Button.h"
 
-#define SS_PIN 10
+#include "RGB_LED.h"
+#include "Button.h"
+#include "keys.h"
+#include "access_ctrl.h"
+
+// RFID Pins
+#define SS_PIN  10
 #define RST_PIN 9
 
-MFRC522 rfid(SS_PIN, RST_PIN); // Instance of the class
+// Solenoid Pin
+#define SOLENOID  8
 
-MFRC522::MIFARE_Key key;
+// RGB LED Pins
+#define RGB_RED   6
+#define RGB_GREEN 4
+#define RGB_BLUE  7
 
-// Init array that will store new NUID
-byte nuidPICC[4];
-
-int solenoid = 8;
-int greenled = 4;
-int redled = 6;
-int blueled = 7;
-bool correct_key = false;
-int state = 0;
+// Initialize a bunch of stuff
 Button btn(2);
-bool locked = true;
-long unlocked_time = 0;
+RGB_LED rgb(RGB_RED, RGB_GREEN, RGB_BLUE);
+
+int state = 0;
 long system_timeout = 0;
 
 /* Bunch of function declarations */
 void printHex(byte *buffer, byte bufferSize);
-void deleteKeys();
-void addKey(byte tag[]);
-bool containsKey(byte tag[]);
+void printDec(byte *buffer, byte bufferSize);
+
+
+int state_normal() {
+  rgb.writeState(0,0,0); 
+  if (btn.read() == HIGH) {
+    return 1; // return next state
+  }
+
+  if (checkNewTag()) {
+    Serial.println("UNLOCK!!");
+    system_timeout = millis(); // resets the timer
+    unlock();
+  }
+  return state;
+}
+
 /**
-   Return the next state
-*/
-int handleIntermediateState() {
+  Return the next state
+ */
+int state_intermediate() {
   long t = btn.getSec();
   long m = btn.getMilli();
   if ( t == -1 ) {
@@ -47,125 +63,53 @@ int handleIntermediateState() {
   }
 }
 
+int state_add() {
+  if (btn.read() == HIGH) {
+    return 4; // Next state
+  }
+  switch (addNewKey()) {
+    case -1:
+      break;
+    case 0:
+      rgb.writeState(1,0,1);
+      delay(250); // Delay to make flash visible
+      break;
+    case 1:
+      rgb.writeState(0,1,1);
+      delay(250);
+      break;
+    }
+    return state; // Else return same state
+}
+
 void setup() {
   Serial.begin(9600);
   SPI.begin(); // Init SPI bus
-  rfid.PCD_Init(); // Init MFRC522
-
-  for (byte i = 0; i < 6; i++) {
-    key.keyByte[i] = 0xFF;
-  }
-
-  Serial.println(F("This code scan the MIFARE Classsic NUID."));
-  Serial.println(F("Using the following key:"));
-  printHex(key.keyByte, MFRC522::MF_KEY_SIZE);
-  Serial.println("");
-
-  pinMode(LED_BUILTIN, OUTPUT);
-
-  pinMode(redled, OUTPUT);
-  pinMode(blueled, OUTPUT);
-  pinMode(greenled, OUTPUT);
-  pinMode(LED_BUILTIN, OUTPUT);
-
+ 
+  init_access_ctrl(SS_PIN, RST_PIN, SOLENOID);
   system_timeout = millis(); // Start up the system timeout
 }
 
-bool handleEEPROM() {
-  // Look for new cards
-  //Serial.println("CHK New Card");
-  if ( ! rfid.PICC_IsNewCardPresent()) {
-    //    Serial.println("ERR Old Card");
-    return false;
-  }
 
-  // Verify if the NUID has been read
-  if ( ! rfid.PICC_ReadCardSerial()) {
-    //    Serial.println("ERR NUID not read");
-    return false;
-  }
-
-
-  Serial.print(F("PICC type: "));
-  MFRC522::PICC_Type piccType = rfid.PICC_GetType(rfid.uid.sak);
-  Serial.println(rfid.PICC_GetTypeName(piccType));
-
-  //  // Check is the PICC of Classic MIFARE type
-  if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&
-      piccType != MFRC522::PICC_TYPE_MIFARE_1K &&
-      piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
-    Serial.println(F("Your tag is not of type MIFARE Classic."));
-    return false;
-  }
-
-  //    Serial.println(F("The NUID tag is:"));
-  //    Serial.print(F("In hex: "));
-  //    printHex(rfid.uid.uidByte, rfid.uid.size);
-  //    Serial.println();
-  //    Serial.print(F("In dec: "));
-  //    printDec(rfid.uid.uidByte, rfid.uid.size);
-  //    Serial.println();
-
-  Serial.print("Res: ");
-  bool res = containsKey(rfid.uid.uidByte);
-  Serial.println(res);
-  if (res) {
-    unlocked_time = millis();
-    digitalWrite(greenled, 0);
-    digitalWrite(redled, 1);
-    digitalWrite(blueled, 1);
-    delay(250); // Delay to make the flash visible
-  }
-  else {
-    digitalWrite(greenled, 1);
-    digitalWrite(redled, 0);
-    digitalWrite(blueled, 1);
-    delay(250); // Delay to make the flash visible
-  }
-  return res;
-}
-
-void handleAddKeyState() {
-  if (btn.read() == HIGH) {
-    state = 4;
-  }
-  else {
-    // Look for new cards
-    if ( ! rfid.PICC_IsNewCardPresent())
-      return;
-
-    // Verify if the NUID has been read
-    if ( ! rfid.PICC_ReadCardSerial())
-      return;
-
-    Serial.print(F("PICC type: "));
-    MFRC522::PICC_Type piccType = rfid.PICC_GetType(rfid.uid.sak);
-    Serial.println(rfid.PICC_GetTypeName(piccType));
-
-    //  // Check is the PICC of Classic MIFARE type
-    if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&
-        piccType != MFRC522::PICC_TYPE_MIFARE_1K &&
-        piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
-      Serial.println(F("Your tag is not of type MIFARE Classic."));
-      return;
-    }
-
-    addKey(rfid.uid.uidByte);
-  }
-}
 
 void loop() {
-  if (!locked && (millis() - unlocked_time > 10000)) {
+  /**
+   * If the locker is locked and system has has been unlocked for longer than 10s, lock
+   */
+  if (unlocked_ms() > 10000) {
     Serial.println("LOCK!");
     system_timeout = millis(); // resets the timer
-    locked = true;
-    digitalWrite(solenoid, LOW);
-    digitalWrite(LED_BUILTIN, LOW);
+    lock();
   }
+  /**
+   * If not in add state or button press and system has timed out (10s)
+   * --> shutdown
+   */
   if ((state == 0 || state == 3) && millis() - system_timeout > 10000) {
     digitalWrite(3, HIGH);  // Turn off system
     Serial.println(F("System timed out!"));
   }
+
   /**
     State Machine:
     0 -> Normal Mode (Read Tag and compare with EEPROM)
@@ -173,61 +117,32 @@ void loop() {
     2 -> Long Press (If t >= TIMEOUT)
     3 -> Short Press (If released and previous state was 1)
     4 -> State after the short press which waits for a button press to return to the Normal Mode
-  */
+   */
   switch (state) {
     case 0:
-      digitalWrite(greenled, 0);
-      digitalWrite(redled, 0);
-      digitalWrite(blueled, 0);
-      //      Serial.print(F("In state 0: Normal state"));
-      //      Serial.print("\n");
-      if (btn.read() == HIGH) {
-        state = 1;
-      }
-      else {
-        // handle EEPROM
-        //        Serial.println(F("handle EEPROM"));
-        if (handleEEPROM()) {
-          Serial.println("UNLOCK!!");
-          system_timeout = millis(); // resets the timer
-          locked = false;
-          unlocked_time = millis();
-          digitalWrite(LED_BUILTIN, HIGH);
-          digitalWrite(solenoid, HIGH);
-        }
-      }
-      
+      state = state_normal();
       break;
     case 1:
-      //      Serial.print(F("In state 1: holding button down"));
-      //      Serial.print("\n");
-      state = handleIntermediateState();
-      digitalWrite(greenled, 0);
-      digitalWrite(redled, 0);
-      digitalWrite(blueled, 1);
+      state = state_intermediate();
+      rgb.writeState(0,0,1);
       break;
     case 2:
       // Handle Long Press -> delete all
-      //      Serial.print(F("In state 2: deleting all keys"));
-      //      Serial.print("\n");
       deleteKeys();
       state = 0;
       system_timeout = millis(); // reset the timer
-      digitalWrite(greenled, 1);
-      digitalWrite(redled, 0);
-      digitalWrite(blueled, 1);
-      delay(1000);  // NOTE: A delay is needed to prevent the state from going to 3 immediately
+      rgb.writeState(0,1,1);
+      // NOTE: A delay is needed to prevent the state from going to 3 immediately
+      delay(1000);
       break;
     case 3:
       // Handle Short press -> add keys state
-      //      Serial.print(F("In state 3: adding keys"));
-      //      Serial.print("\n");
-      handleAddKeyState();
-      digitalWrite(greenled, 1);
-      digitalWrite(redled, 0);
-      digitalWrite(blueled, 0);
+      state = state_add();
+      rgb.writeState(0, 1, 0);
       break;
-    case 4: // Extra state after done adding keys, need to press button again to go back to normal state
+    case 4: 
+      // Extra state after done adding keys
+      // - press button again to go back to normal state
       if (btn.read() == LOW) {
         state = 0;
         system_timeout = millis(); // reset the timer
@@ -236,22 +151,9 @@ void loop() {
   }
 }
 
-
-//  else Serial.println(F("Card read previously."));
-//
-//  // Halt PICC
-//  rfid.PICC_HaltA();
-//
-//  // Stop encryption on PCD
-//  rfid.PCD_StopCrypto1();
-//}
-
-void lightLED(void) {
-  digitalWrite(solenoid, HIGH);
-}
 /**
-   Helper routine to dump a byte array as hex values to Serial.
-*/
+  Helper routine to dump a byte array as hex values to Serial.
+ */
 void printHex(byte *buffer, byte bufferSize) {
   for (byte i = 0; i < bufferSize; i++) {
     Serial.print(buffer[i] < 0x10 ? " 0" : " ");
@@ -260,72 +162,11 @@ void printHex(byte *buffer, byte bufferSize) {
 }
 
 /**
-   Helper routine to dump a byte array as dec values to Serial.
-*/
+  Helper routine to dump a byte array as dec values to Serial.
+ */
 void printDec(byte *buffer, byte bufferSize) {
   for (byte i = 0; i < bufferSize; i++) {
     Serial.print(buffer[i] < 0x10 ? " 0" : " ");
     Serial.print(buffer[i], DEC);
   }
-}
-
-
-void addKey(byte tag[]) {
-  if (containsKey(tag)) {
-    Serial.println("Key already added!");
-    digitalWrite(greenled, 1);
-    digitalWrite(redled, 0);
-    digitalWrite(blueled, 1);
-    delay(250); // Delay to make the flash visible
-    system_timeout = millis(); // resets the timer
-    return;
-  }
-
-  digitalWrite(greenled, 0);
-  digitalWrite(redled, 1);
-  digitalWrite(blueled, 1);
-
-  delay(250); // Delay to make the flash visible
-  
-  uint8_t offset = EEPROM.read(0);
-  int addr = (offset * 4) + 1;
-  for (int i = 0; i < 4; i++) {
-    EEPROM.write(addr + i, tag[i]);
-  }
-  uint32_t id;
-  memcpy(&id, tag, 4);
-  Serial.print("Added tag ");
-  Serial.println(id, HEX);
-  offset += 1;
-  EEPROM.write(0, offset);
-
-  system_timeout = millis(); // resets the timer
-}
-
-void deleteKeys() {
-  EEPROM.write(0, 0);
-}
-
-bool containsKey(byte tag[]) {
-  bool res = false;
-  uint32_t id;
-  memcpy(&id, tag, 4);
-  Serial.print("Looking for: ");
-  Serial.println(id, HEX);
-  uint8_t offset = EEPROM.read(0);
-  int end = (offset * 4) + 1;
-  byte cur[4];
-  for (int i = 1; i < end; i += 4) {
-    for (int j = 0; j < 4; j++) {
-      cur[j] = EEPROM.read(j + i);
-    }
-    uint32_t id2;
-    memcpy(&id2, cur, 4);
-    Serial.print("Found: ");
-    Serial.println(id2, HEX);
-    if (id == id2) {
-      res = true;
-    }
-  }
-  return res;
 }
