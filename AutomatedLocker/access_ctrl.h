@@ -17,9 +17,12 @@ void init_access_ctrl(int ss_pin, int rst_pin, int solenoid_pin);
  * 1. There is a new tag present; and
  * 2. The tag is valid (present in EEPROM)
  *
- * @returns Tag validity
+ * @returns
+ * -> -1 if nothing happens
+ * -> 0 if 0 matching tags in EEPROM
+ * -> 1 if 1 matching tag in EEPROM
  */
-bool checkNewTag();
+int checkNewTag();
 
 /**
  * Will do the following:

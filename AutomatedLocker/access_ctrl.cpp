@@ -1,6 +1,6 @@
 
 #include <SPI.h>
-
+#include "Arduino.h"
 #include "access_ctrl.h"
 #include "keys.h"
 
@@ -15,6 +15,7 @@ void init_access_ctrl(int ss_pin, int rst_pin, int solenoid_pin)
 {
   if (init_p) return;
   solenoid = solenoid_pin;
+  pinMode(solenoid, OUTPUT);
   locked = true;
   unlocked_time = -1;
   rfid = new MFRC522(ss_pin, rst_pin);
@@ -48,17 +49,17 @@ static bool detectKey() {
   return true;
 }
 
-bool checkNewTag() {
+int checkNewTag() {
   if (!init_p) {
     Serial.println("Uninitialized Access Control");
-    return false;
+    return -1;
   }
 
   if (detectKey()) {
     // Return whether read key is present in EEPROM
-    return containsKey(rfid->uid.uidByte);
+    return (containsKey(rfid->uid.uidByte)) ? 1:0;
   }
-  return false;
+  return -1;
 }
 
 int addNewKey() {

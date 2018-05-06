@@ -36,11 +36,16 @@ int state_normal() {
   if (btn.read() == HIGH) {
     return 1; // return next state
   }
-
-  if (checkNewTag()) {
+  int isThere = checkNewTag();
+  if (isThere == 1) {
     Serial.println("UNLOCK!!");
     system_timeout = millis(); // resets the timer
     unlock();
+    rgb.writeState(1,0,1);
+    delay(250);
+  } else if (isThere == 0) {
+    rgb.writeState(0,1,1);
+    delay(250);
   }
   return state;
 }
