@@ -70,18 +70,21 @@ int state_intermediate() {
 
 int state_add() {
   if (btn.read() == HIGH) {
+    Serial.println("Quitting Add State");
     return 4; // Next state
   }
   switch (addNewKey()) {
     case -1:
-      break;
+      return state;
     case 0:
       rgb.writeState(1,0,1);
       delay(250); // Delay to make flash visible
+      system_timeout = millis();
       break;
     case 1:
       rgb.writeState(0,1,1);
       delay(250);
+      system_timeout = millis();
       break;
     }
     return state; // Else return same state
@@ -93,6 +96,8 @@ void setup() {
  
   init_access_ctrl(SS_PIN, RST_PIN, SOLENOID);
   system_timeout = millis(); // Start up the system timeout
+
+  Serial.println(F("Finished Setup"));
 }
 
 
