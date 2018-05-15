@@ -32,7 +32,7 @@ void printDec(byte *buffer, byte bufferSize);
 
 
 int state_normal() {
-  rgb.writeState(0,0,0); 
+  rgb.writeState(1,1,0); 
   if (btn.read() == HIGH) {
     return 1; // return next state
   }
