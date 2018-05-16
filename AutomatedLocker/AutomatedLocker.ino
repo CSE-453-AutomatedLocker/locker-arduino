@@ -44,6 +44,7 @@ int state_normal() {
     rgb.writeState(1,0,1);
     delay(250);
   } else if (isThere == 0) {
+    system_timeout = millis(); // resets the timer
     rgb.writeState(0,1,1);
     delay(250);
   }
@@ -82,7 +83,7 @@ int state_add() {
       system_timeout = millis();
       break;
     case 1:
-      rgb.writeState(0,1,1);
+      rgb.writeState(1,0,1);
       delay(250);
       system_timeout = millis();
       break;
@@ -134,7 +135,6 @@ void loop() {
       break;
     case 1:
       state = state_intermediate();
-      rgb.writeState(0,0,1);
       break;
     case 2:
       // Handle Long Press -> delete all
